@@ -318,7 +318,7 @@ class PPO(OnPolicyAlgorithm[PPOConfig]):
     def update_value_function(self, data: Rollout) -> tuple[Self, LogDict]:
         assert self.value_function is not None
 
-        def value_function_loss(params: FrozenDict) -> tuple[Float[Array, ""], LogDict]:
+        def value_function_loss(params: FrozenDict, data: Rollout) -> tuple[Float[Array, ""], LogDict]:
             assert self.value_function is not None
             new_values: Float[Array, "*batch 1"]
             new_values = self.value_function.apply_fn(params, data.observations)

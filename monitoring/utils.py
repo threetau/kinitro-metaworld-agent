@@ -4,6 +4,7 @@ from typing import Any, TYPE_CHECKING, Optional
 import flax.struct
 import flax.traverse_util
 import jax.numpy as jnp
+import numpy as np
 import numpy.typing as npt
 from jaxtyping import Array, Float, PyTree
 from torch.utils.tensorboard import SummaryWriter
@@ -40,14 +41,31 @@ def log(logs: dict, step: int) -> None:
             if isinstance(value, Histogram):
                 # Convert histogram to TensorBoard format
                 if value.data is not None:
-                    _tensorboard_writer.add_histogram(key, value.data, step)
+                    # Convert JAX arrays to NumPy for TensorBoard
+                    if hasattr(value.data, '__array__'):
+                        data_np = np.array(value.data)
+                    else:
+                        data_np = value.data
+                    _tensorboard_writer.add_histogram(key, data_np, step)
                 elif value.np_histogram is not None:
                     hist, bins = value.np_histogram
-                    _tensorboard_writer.add_histogram(key, bins[:-1], step)
+                    # Convert JAX arrays to NumPy for TensorBoard
+                    if hasattr(bins, '__array__'):
+                        bins_np = np.array(bins)
+                    else:
+                        bins_np = bins
+                    _tensorboard_writer.add_histogram(key, bins_np[:-1], step)
             elif isinstance(value, (int, float)):
                 _tensorboard_writer.add_scalar(key, value, step)
             elif hasattr(value, 'item'):  # JAX/NumPy scalars
                 _tensorboard_writer.add_scalar(key, value.item(), step)
+            elif hasattr(value, '__array__'):  # JAX/NumPy arrays
+                # Convert JAX arrays to NumPy for TensorBoard
+                value_np = np.array(value)
+                if value_np.ndim == 0:  # Scalar array
+                    _tensorboard_writer.add_scalar(key, value_np.item(), step)
+                else:  # Multi-dimensional array - log as histogram
+                    _tensorboard_writer.add_histogram(key, value_np, step)
         _tensorboard_writer.flush()
 
 
