@@ -9,7 +9,8 @@ from typing import Dict, Optional
 import gymnasium as gym
 import metaworld
 import numpy as np
-from agent import RLAgent
+# from agent import RLAgent  # SAC agent
+from agent_ppo import RLAgent  # PPO agent
 
 from torch.utils.tensorboard import SummaryWriter
 

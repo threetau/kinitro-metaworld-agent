@@ -1,34 +1,26 @@
-#!/usr/bin/env python3
 """
-Training script for SAC model on MT10.
-
-This script trains a SAC model using the configuration from your example,
-which can then be used by the RLAgent. Includes TensorBoard logging for monitoring.
+Training script for PPO model on MetaWorld tasks.
 """
 
 import logging
-import subprocess
-import threading
-import time
-import webbrowser
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
 import tyro
 
-from config.networks import (
-    ContinuousActionPolicyConfig,
-    QValueFunctionConfig,
-)
+from config.networks import ContinuousActionPolicyConfig, ValueFunctionConfig
 from config.nn import VanillaNetworkConfig
 from config.optim import OptimizerConfig
-from config.rl import OffPolicyTrainingConfig
+from config.rl import OnPolicyTrainingConfig
 from envs.metaworld import MetaworldConfig
-from rl.algorithms import SACConfig
+from rl.algorithms import PPOConfig
 from run import Run
 from monitoring.utils import set_tensorboard_writer, close_tensorboard_writer
-
+import time
+import subprocess
+import threading
+import webbrowser
 
 @dataclass(frozen=True)
 class Args:
@@ -43,8 +35,8 @@ def setup_logging(level=logging.INFO):
     """Configure logging."""
     logging.basicConfig(
         level=level,
-        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-        handlers=[logging.StreamHandler()],
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
 
@@ -95,14 +87,17 @@ def launch_tensorboard(log_dir, port=6006):
     
     return f"http://localhost:{port}"
 
-
 def main() -> None:
+    """Main training function."""
     args = tyro.cli(Args)
     
     # Setup logging
     setup_logging()
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger("ppo:train")
     
+    logger.info(f"Starting PPO training with seed {args.seed}")
+    logger.info(f"Data directory: {args.data_dir}")
+
     # Determine TensorBoard usage
     use_tensorboard = not args.no_tensorboard
     
@@ -110,83 +105,69 @@ def main() -> None:
     tensorboard_log_dir = None
     if use_tensorboard:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        tensorboard_log_dir = args.data_dir / f"tensorboard_logs/mt50_sac_{timestamp}"
+        tensorboard_log_dir = args.data_dir / f"tensorboard_logs/mt50_ppo_{timestamp}"
         tensorboard_log_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"TensorBoard logging enabled: {tensorboard_log_dir}")
 
     # Setup TensorBoard logging if enabled
     if use_tensorboard and tensorboard_log_dir:
         set_tensorboard_writer(str(tensorboard_log_dir))
+        print(f"TensorBoard writer initialized for training logging: {tensorboard_log_dir}")
         logger.info("TensorBoard writer initialized for training logging")
 
+
+    num_tasks = 50
+
     run = Run(
-        run_name="mt50_sac",
+        run_name="mt50_ppo",
         seed=args.seed,
         data_dir=args.data_dir,
-        env=MetaworldConfig(
-            env_id="MT50",
-            terminate_on_success=False,
-        ),
-        algorithm=SACConfig(
-            num_tasks=10,
+        env=MetaworldConfig(env_id="MT50"),
+        algorithm=PPOConfig(
+            num_tasks=num_tasks,
             gamma=0.99,
-            actor_config=ContinuousActionPolicyConfig(
-                network_config=VanillaNetworkConfig(
-                    optimizer=OptimizerConfig(max_grad_norm=1.0)
-                )
-            ),
-            critic_config=QValueFunctionConfig(
+            policy_config=ContinuousActionPolicyConfig(
                 network_config=VanillaNetworkConfig(
                     optimizer=OptimizerConfig(max_grad_norm=1.0),
                 )
             ),
-            num_critics=2,
+            vf_config=ValueFunctionConfig(
+                network_config=VanillaNetworkConfig(
+                    optimizer=OptimizerConfig(max_grad_norm=1.0),
+                )
+            ),
+            num_epochs=16,
+            num_gradient_steps=32,
+            gae_lambda=0.97,
+            target_kl=None,
+            clip_vf_loss=False,
         ),
-        training_config=OffPolicyTrainingConfig(
-            total_steps=int(2e7),
-            buffer_size=int(1e6),
-            batch_size=1280,
+        training_config=OnPolicyTrainingConfig(
+            total_steps=int(1e8),
+            rollout_steps=2_000,  # Reduced from 10,000 to 2,000 for more frequent logging
+            evaluation_frequency=50,  # Evaluate every 50 episodes for more frequent logging
         ),
         checkpoint=True,
         resume=args.resume,
     )
 
-
-    # Launch TensorBoard if enabled
     tensorboard_url = None
     if use_tensorboard and tensorboard_log_dir:
-        logger.info("Starting TensorBoard...")
+        print("Starting TensorBoard...")
         try:
             tensorboard_url = launch_tensorboard(tensorboard_log_dir, args.tensorboard_port)
-            logger.info(f"TensorBoard available at: {tensorboard_url}")
-            logger.info("TensorBoard will show training metrics in real-time")
+            print(f"TensorBoard available at: {tensorboard_url}")
+            print("TensorBoard will show training metrics in real-time")
         except Exception as e:
-            logger.warning(f"Failed to start TensorBoard: {e}")
-            logger.info("Continuing training without TensorBoard...")
+            print(f"Failed to start TensorBoard: {e}")
+            print("Continuing training without TensorBoard...")
 
-    try:
-        logger.info("Starting SAC training...")
-        run.start()
-        logger.info("Training completed successfully")
-        
-        if tensorboard_url:
-            logger.info(f"View training metrics at: {tensorboard_url}")
-            logger.info("TensorBoard will continue running in the background")
-            
-    except KeyboardInterrupt:
-        logger.info("Training stopped by user")
-        if tensorboard_url:
-            logger.info(f"TensorBoard still available at: {tensorboard_url}")
-    except Exception as e:
-        logger.error(f"Error during training: {e}", exc_info=True)
-        if tensorboard_url:
-            logger.info(f"TensorBoard still available at: {tensorboard_url}")
-        raise
-    finally:
-        # Clean up TensorBoard writer
-        if use_tensorboard:
-            close_tensorboard_writer()
-            logger.info("TensorBoard writer closed")
+    logger.info("Starting training...")
+    run.start()
+    logger.info("Training completed!")
+    if use_tensorboard:
+        close_tensorboard_writer()
+        logger.info("TensorBoard writer closed")
 
 
 if __name__ == "__main__":

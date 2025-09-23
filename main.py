@@ -15,7 +15,8 @@ import threading
 import time
 import webbrowser
 
-from agent import RLAgent
+# from agent_sac import RLAgent  # SAC agent
+from agent import RLAgent  # PPO agent
 from evaluation import AgentEvaluator
 
 
