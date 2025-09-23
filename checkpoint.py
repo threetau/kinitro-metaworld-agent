@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING, NotRequired, TypedDict
 import numpy as np
 import orbax.checkpoint as ocp
 
-from metaworld_algorithms.rl.buffers import AbstractReplayBuffer
-from metaworld_algorithms.types import (
+from rl.buffers import AbstractReplayBuffer
+from metaworld_types import (
     CheckpointMetadata,
     EnvCheckpoint,
     GymVectorEnv,
@@ -15,7 +15,7 @@ from metaworld_algorithms.types import (
 )
 
 if TYPE_CHECKING:
-    from metaworld_algorithms.rl.algorithms.base import Algorithm
+    from rl.algorithms.base import Algorithm
 
 
 class Checkpoint(TypedDict):

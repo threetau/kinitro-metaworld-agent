@@ -16,21 +16,21 @@ from flax import struct
 from flax.core import FrozenDict
 from jaxtyping import Array, Float, PRNGKeyArray, PyTree
 
-from metaworld_algorithms.config.envs import EnvConfig
-from metaworld_algorithms.config.networks import (
+from config.envs import EnvConfig
+from config.networks import (
     ContinuousActionPolicyConfig,
     QValueFunctionConfig,
 )
-from metaworld_algorithms.config.optim import OptimizerConfig
-from metaworld_algorithms.config.rl import AlgorithmConfig, OffPolicyTrainingConfig
-from metaworld_algorithms.optim.pcgrad import PCGradState
-from metaworld_algorithms.rl.buffers import MultiTaskReplayBuffer
-from metaworld_algorithms.rl.networks import (
+from config.optim import OptimizerConfig
+from config.rl import AlgorithmConfig, OffPolicyTrainingConfig
+from optim.pcgrad import PCGradState
+from rl.buffers import MultiTaskReplayBuffer
+from rl.networks import (
     ContinuousActionPolicy,
     Ensemble,
     QValueFunction,
 )
-from metaworld_algorithms.types import (
+from metaworld_types import (
     Action,
     LogDict,
     Observation,

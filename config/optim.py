@@ -3,9 +3,9 @@ from dataclasses import dataclass
 import jax
 import optax
 
-from metaworld_algorithms.optim.dummy import dummy_multitask_optimizer
-from metaworld_algorithms.optim.gradnorm import gradnorm
-from metaworld_algorithms.optim.pcgrad import pcgrad
+from optim.dummy import dummy_multitask_optimizer
+from optim.gradnorm import gradnorm
+from optim.pcgrad import pcgrad
 
 from .utils import Optimizer
 

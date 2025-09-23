@@ -3,7 +3,7 @@ from collections.abc import Callable
 import flax.linen as nn
 import jax
 
-from metaworld_algorithms.config.nn import VanillaNetworkConfig
+from config.nn import VanillaNetworkConfig
 
 from .utils import name_prefix
 

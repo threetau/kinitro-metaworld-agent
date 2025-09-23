@@ -1,4 +1,4 @@
-from metaworld_algorithms.config.rl import AlgorithmConfig
+from config.rl import AlgorithmConfig
 
 from .base import Algorithm, OffPolicyAlgorithm
 from .mtsac import MTSAC, MTSACConfig

@@ -10,7 +10,7 @@ from flax.training.train_state import TrainState as FlaxTrainState
 from jaxtyping import Float
 from typing_extensions import Callable
 
-from metaworld_algorithms.types import Rollout
+from metaworld_types import Rollout
 
 
 class TrainState(FlaxTrainState):

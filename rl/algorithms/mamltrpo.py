@@ -13,17 +13,17 @@ from flax import struct
 from flax.core import FrozenDict
 from jaxtyping import Array, Float, PRNGKeyArray
 
-from metaworld_algorithms.config.envs import MetaLearningEnvConfig
-from metaworld_algorithms.config.networks import (
+from config.envs import MetaLearningEnvConfig
+from config.networks import (
     ContinuousActionPolicyConfig,
 )
-from metaworld_algorithms.config.rl import AlgorithmConfig
-from metaworld_algorithms.nn.distributions import TanhMultivariateNormalDiag
-from metaworld_algorithms.rl.algorithms.utils import MetaTrainState, TrainState
-from metaworld_algorithms.rl.networks import (
+from config.rl import AlgorithmConfig
+from nn.distributions import TanhMultivariateNormalDiag
+from rl.algorithms.utils import MetaTrainState, TrainState
+from rl.networks import (
     EnsembleMDContinuousActionPolicy,
 )
-from metaworld_algorithms.types import (
+from metaworld_types import (
     Action,
     AuxPolicyOutputs,
     LogDict,

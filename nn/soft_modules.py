@@ -2,7 +2,7 @@ import flax.linen as nn
 import jax
 import jax.numpy as jnp
 
-from metaworld_algorithms.config.nn import SoftModulesConfig
+from config.nn import SoftModulesConfig
 
 from .base import MLP
 from .initializers import uniform

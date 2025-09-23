@@ -1,6 +1,15 @@
 import flax.linen as nn
 
-import metaworld_algorithms.config.nn
+import config.nn
+from config.nn import (
+    CAREConfig,
+    FiLMConfig,
+    MOOREConfig,
+    MultiHeadConfig,
+    PaCoConfig,
+    SoftModulesConfig,
+    VanillaNetworkConfig,
+)
 
 from .base import  VanillaNetwork
 from .care import CARENetwork
@@ -12,25 +21,25 @@ from .soft_modules import SoftModularizationNetwork
 
 
 def get_nn_arch_for_config(
-    config: metaworld_algorithms.config.nn.NeuralNetworkConfig,
+    config: config.nn.NeuralNetworkConfig,
 ) -> type[nn.Module]:
-    if type(config) is metaworld_algorithms.config.nn.MultiHeadConfig:
+    if type(config) is MultiHeadConfig:
         return MultiHeadNetwork
-    elif type(config) is metaworld_algorithms.config.nn.SoftModulesConfig:
+    elif type(config) is SoftModulesConfig:
         return SoftModularizationNetwork
-    elif type(config) is metaworld_algorithms.config.nn.PaCoConfig:
+    elif type(config) is PaCoConfig:
         return PaCoNetwork
-    elif type(config) is metaworld_algorithms.config.nn.CAREConfig:
+    elif type(config) is CAREConfig:
         return CARENetwork
-    elif type(config) is metaworld_algorithms.config.nn.FiLMConfig:
+    elif type(config) is FiLMConfig:
         return FiLMNetwork
-    elif type(config) is metaworld_algorithms.config.nn.MOOREConfig:
+    elif type(config) is MOOREConfig:
         return MOORENetwork
-    elif type(config) is metaworld_algorithms.config.nn.VanillaNetworkConfig:
+    elif type(config) is VanillaNetworkConfig:
         return VanillaNetwork
     else:
         raise ValueError(
-            f"Unknown config type: {type(config)}. (NeuralNetworkConfig by itself is not supported, use VanillaNeworkConfig)"
+            f"Unknown config type: {type(config)}. (NeuralNetworkConfig by itself is not supported, use VanillaNetworkConfig)"
         )
 
 

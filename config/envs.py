@@ -4,7 +4,7 @@ from functools import cached_property
 
 import gymnasium as gym
 
-from metaworld_algorithms.types import Agent, GymVectorEnv, MetaLearningAgent
+from metaworld_types import Agent, GymVectorEnv, MetaLearningAgent
 
 
 @dataclass(frozen=True)

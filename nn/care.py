@@ -3,7 +3,7 @@ import flax.linen as nn
 import jax
 import jax.numpy as jnp
 
-from metaworld_algorithms.config.nn import CAREConfig
+from config.nn import CAREConfig
 
 from .base import MLP
 

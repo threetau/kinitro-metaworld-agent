@@ -2,7 +2,7 @@ import flax.linen as nn
 import jax
 import jax.numpy as jnp
 
-from metaworld_algorithms.config.nn import PaCoConfig
+from config.nn import PaCoConfig
 
 
 def CompositionalDense(num_parameter_sets: int):

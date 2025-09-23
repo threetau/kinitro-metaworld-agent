@@ -14,18 +14,18 @@ from flax import struct
 from flax.linen import FrozenDict
 from jaxtyping import Array, Float, PRNGKeyArray, PyTree
 
-from metaworld_algorithms.config.envs import MetaLearningEnvConfig
-from metaworld_algorithms.config.networks import RecurrentContinuousActionPolicyConfig
-from metaworld_algorithms.config.rl import AlgorithmConfig
-from metaworld_algorithms.monitoring.utils import (
+from config.envs import MetaLearningEnvConfig
+from config.networks import RecurrentContinuousActionPolicyConfig
+from config.rl import AlgorithmConfig
+from monitoring.utils import (
     Histogram,
     get_logs,
     prefix_dict,
     pytree_histogram,
 )
-from metaworld_algorithms.nn.distributions import TanhMultivariateNormalDiag
-from metaworld_algorithms.rl.algorithms.base import RNNBasedMetaLearningAlgorithm
-from metaworld_algorithms.rl.algorithms.utils import (
+from nn.distributions import TanhMultivariateNormalDiag
+from rl.algorithms.base import RNNBasedMetaLearningAlgorithm
+from rl.algorithms.utils import (
     LinearFeatureBaseline,
     RNNTrainState,
     compute_gae,
@@ -34,8 +34,8 @@ from metaworld_algorithms.rl.algorithms.utils import (
     to_deterministic_minibatch_iterator,
     to_overlapping_chunks,
 )
-from metaworld_algorithms.rl.networks import RecurrentContinuousActionPolicy
-from metaworld_algorithms.types import (
+from rl.networks import RecurrentContinuousActionPolicy
+from metaworld_types import (
     Action,
     AuxPolicyOutputs,
     LogDict,

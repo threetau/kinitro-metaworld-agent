@@ -6,9 +6,9 @@ import optax
 
 
 def _uniform_init(bound: float) -> jax.nn.initializers.Initializer:
-    import metaworld_algorithms.nn.initializers
+    from nn import initializers
 
-    return metaworld_algorithms.nn.initializers.uniform(bound)
+    return initializers.uniform(bound)
 
 
 class Initializer(enum.Enum):

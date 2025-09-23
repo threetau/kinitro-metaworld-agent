@@ -1,14 +1,15 @@
-from typing import Any, TYPE_CHECKING
+import os
+from typing import Any, TYPE_CHECKING, Optional
 
 import flax.struct
 import flax.traverse_util
 import jax.numpy as jnp
 import numpy.typing as npt
-import wandb
 from jaxtyping import Array, Float, PyTree
+from torch.utils.tensorboard import SummaryWriter
 
 if TYPE_CHECKING:
-    from metaworld_algorithms.types import LogDict
+    from metaworld_types import LogDict
 
 
 class Histogram(flax.struct.PyTreeNode):
@@ -16,11 +17,38 @@ class Histogram(flax.struct.PyTreeNode):
     np_histogram: tuple | None = None
 
 
+# Global TensorBoard writer for training
+_tensorboard_writer: Optional[SummaryWriter] = None
+
+def set_tensorboard_writer(log_dir: str) -> None:
+    """Set up global TensorBoard writer for training logging."""
+    global _tensorboard_writer
+    os.makedirs(log_dir, exist_ok=True)
+    _tensorboard_writer = SummaryWriter(log_dir)
+
+def close_tensorboard_writer() -> None:
+    """Close the global TensorBoard writer."""
+    global _tensorboard_writer
+    if _tensorboard_writer is not None:
+        _tensorboard_writer.close()
+        _tensorboard_writer = None
+
 def log(logs: dict, step: int) -> None:
-    for key, value in logs.items():
-        if isinstance(value, Histogram):
-            logs[key] = wandb.Histogram(value.data, np_histogram=value.np_histogram)  # pyright: ignore[reportArgumentType]
-    wandb.log(logs, step=step)
+    """Log function for TensorBoard."""
+    if _tensorboard_writer is not None:
+        for key, value in logs.items():
+            if isinstance(value, Histogram):
+                # Convert histogram to TensorBoard format
+                if value.data is not None:
+                    _tensorboard_writer.add_histogram(key, value.data, step)
+                elif value.np_histogram is not None:
+                    hist, bins = value.np_histogram
+                    _tensorboard_writer.add_histogram(key, bins[:-1], step)
+            elif isinstance(value, (int, float)):
+                _tensorboard_writer.add_scalar(key, value, step)
+            elif hasattr(value, 'item'):  # JAX/NumPy scalars
+                _tensorboard_writer.add_scalar(key, value.item(), step)
+        _tensorboard_writer.flush()
 
 
 def get_logs(

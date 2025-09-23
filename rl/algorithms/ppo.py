@@ -15,21 +15,21 @@ from flax.core import FrozenDict
 from flax.training.train_state import TrainState
 from jaxtyping import Array, Float, PRNGKeyArray, PyTree
 
-from metaworld_algorithms.config.envs import EnvConfig
-from metaworld_algorithms.config.networks import (
+from config.envs import EnvConfig
+from config.networks import (
     ContinuousActionPolicyConfig,
     ValueFunctionConfig,
 )
-from metaworld_algorithms.config.rl import AlgorithmConfig
-from metaworld_algorithms.monitoring.utils import (
+from config.rl import AlgorithmConfig
+from monitoring.utils import (
     Histogram,
     get_logs,
     prefix_dict,
     pytree_histogram,
 )
-from metaworld_algorithms.rl.algorithms.utils import to_minibatch_iterator
-from metaworld_algorithms.rl.networks import ContinuousActionPolicy, ValueFunction
-from metaworld_algorithms.types import (
+from rl.algorithms.utils import to_minibatch_iterator
+from rl.networks import ContinuousActionPolicy, ValueFunction
+from metaworld_types import (
     Action,
     AuxPolicyOutputs,
     LogDict,

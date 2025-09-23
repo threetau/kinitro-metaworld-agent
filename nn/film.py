@@ -3,7 +3,7 @@ import flax.linen as nn
 import jax
 import jax.numpy as jnp
 
-from metaworld_algorithms.config.nn import FiLMConfig
+from config.nn import FiLMConfig
 
 from .base import MLP
 

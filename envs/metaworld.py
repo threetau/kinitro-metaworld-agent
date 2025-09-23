@@ -6,9 +6,9 @@ from typing import override
 import gymnasium as gym
 import numpy as np
 
-from metaworld_algorithms.types import Agent, MetaLearningAgent, GymVectorEnv
+from metaworld_types import Agent, MetaLearningAgent, GymVectorEnv
 
-from metaworld_algorithms.config.envs import EnvConfig, MetaLearningEnvConfig
+from config.envs import EnvConfig, MetaLearningEnvConfig
 from metaworld.evaluation import evaluation, metalearning_evaluation
 
 

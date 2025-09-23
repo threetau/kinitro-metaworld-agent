@@ -6,7 +6,7 @@ import numpy as np
 import numpy.typing as npt
 from jaxtyping import Float
 
-from metaworld_algorithms.types import (
+from metaworld_types import (
     Action,
     Observation,
     RNNState,

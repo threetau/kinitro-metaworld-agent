@@ -2,8 +2,8 @@ import flax.linen as nn
 import jax
 import jax.numpy as jnp
 
-from metaworld_algorithms.config.nn import MultiHeadConfig
-from metaworld_algorithms.nn.regularizers import L2Normalize
+from config.nn import MultiHeadConfig
+from nn.regularizers import L2Normalize
 
 
 class MultiHeadNetwork(nn.Module):

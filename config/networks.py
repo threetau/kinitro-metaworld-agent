@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from metaworld_algorithms.config.utils import Initializer, StdType
+from config.utils import Initializer, StdType
 
 from .nn import NeuralNetworkConfig, RecurrentNeuralNetworkConfig, VanillaNetworkConfig
 

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from metaworld_algorithms.rl.algorithms.base import Algorithm
+    from rl.algorithms.base import Algorithm
 
     from .envs import EnvConfig
 
@@ -13,7 +13,7 @@ class AlgorithmConfig:
     gamma: float = 0.99
 
     def spawn(self, env: "EnvConfig", seed: int) -> "Algorithm":
-        from metaworld_algorithms.rl.algorithms import get_algorithm_for_config
+        from rl.algorithms import get_algorithm_for_config
 
         return get_algorithm_for_config(self).initialize(self, env, seed)
 

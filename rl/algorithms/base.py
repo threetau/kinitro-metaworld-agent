@@ -9,9 +9,9 @@ import orbax.checkpoint as ocp
 from flax import struct
 from jaxtyping import Float
 
-from metaworld_algorithms.checkpoint import get_checkpoint_save_args
-from metaworld_algorithms.config.envs import EnvConfig, MetaLearningEnvConfig
-from metaworld_algorithms.config.rl import (
+from checkpoint import get_checkpoint_save_args
+from config.envs import EnvConfig, MetaLearningEnvConfig
+from config.rl import (
     AlgorithmConfig,
     GradientBasedMetaLearningTrainingConfig,
     MetaLearningTrainingConfig,
@@ -20,12 +20,12 @@ from metaworld_algorithms.config.rl import (
     RNNBasedMetaLearningTrainingConfig,
     TrainingConfig,
 )
-from metaworld_algorithms.monitoring.utils import log
-from metaworld_algorithms.rl.buffers import (
+from monitoring.utils import log
+from rl.buffers import (
     AbstractReplayBuffer,
     MultiTaskRolloutBuffer,
 )
-from metaworld_algorithms.types import (
+from metaworld_types import (
     Action,
     AuxPolicyOutputs,
     CheckpointMetadata,

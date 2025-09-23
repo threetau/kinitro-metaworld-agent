@@ -7,16 +7,16 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import PRNGKeyArray
 
-from metaworld_algorithms.config.networks import (
+from config.networks import (
     ContinuousActionPolicyConfig,
     QValueFunctionConfig,
     RecurrentContinuousActionPolicyConfig,
     ValueFunctionConfig,
 )
-from metaworld_algorithms.config.utils import CellType, StdType
-from metaworld_algorithms.nn import get_nn_arch_for_config
-from metaworld_algorithms.nn.distributions import TanhMultivariateNormalDiag
-from metaworld_algorithms.nn.initializers import uniform
+from config.utils import CellType, StdType
+from nn import get_nn_arch_for_config
+from nn.distributions import TanhMultivariateNormalDiag
+from nn.initializers import uniform
 
 
 class ContinuousActionPolicyTorso(nn.Module):
