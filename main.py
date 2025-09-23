@@ -172,6 +172,12 @@ Examples:
         default=None,
         help="TensorBoard log directory (auto-generated if not specified)",
     )
+    eval_parser.add_argument(
+        "--model-path",
+        type=str,
+        default=None,
+        help="Path to trained model checkpoint directory",
+    )
 
     args = parser.parse_args()
 
@@ -240,6 +246,7 @@ def run_evaluation(args, logger):
         seed=args.seed,
         use_tensorboard=use_tensorboard,
         log_dir=log_dir,
+        model_path=args.model_path,
     )
 
     if args.list_tasks:

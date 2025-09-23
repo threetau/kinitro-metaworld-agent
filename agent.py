@@ -112,7 +112,7 @@ class RLAgent(AgentInterface):
                 
             checkpoint_manager = ocp.CheckpointManager(
                 Path(self.model_path).parent,
-                item_names=("agent", "metadata"),
+                item_names=("agent", "env_states", "rngs", "buffer", "metadata"),
                 options=ocp.CheckpointManagerOptions(create=False),
             )
             

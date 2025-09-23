@@ -29,6 +29,7 @@ class AgentEvaluator:
         seed: Optional[int] = None,
         use_tensorboard: bool = True,
         log_dir: Optional[str] = None,
+        model_path: Optional[str] = None,
     ):
         """
         Initialize the evaluator.
@@ -50,6 +51,7 @@ class AgentEvaluator:
         self.use_tensorboard = use_tensorboard
 
         self.logger = logging.getLogger(__name__)
+        self.model_path = model_path
         self.env = None
         self.agent = None
 
@@ -90,6 +92,7 @@ class AgentEvaluator:
         self.use_tensorboard = use_tensorboard
 
         self.logger = logging.getLogger(__name__)
+        self.model_path = model_path
         self.env = None
         self.agent = None
 
@@ -158,12 +161,13 @@ class AgentEvaluator:
 
             return env
 
-    def setup_agent(self, env: gym.Env) -> RLAgent:
+    def setup_agent(self, env: gym.Env, model_path: Optional[str] = None) -> RLAgent:
         """
         Set up the agent with the environment's observation and action spaces.
 
         Args:
             env: The gymnasium environment
+            model_path: Path to trained model checkpoint directory
 
         Returns:
             Configured RLAgent
@@ -173,6 +177,7 @@ class AgentEvaluator:
             action_space=env.action_space,
             seed=self.seed,
             max_episode_steps=self.max_steps_per_episode,
+            model_path=model_path,
         )
 
         self.logger.info("Agent initialized successfully")
@@ -288,7 +293,7 @@ class AgentEvaluator:
 
         # Setup environment and agent
         self.env = self.setup_environment()
-        self.agent = self.setup_agent(self.env)
+        self.agent = self.setup_agent(self.env, self.model_path)
 
         # Run episodes
         total_successes = 0
