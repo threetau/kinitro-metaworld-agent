@@ -1,5 +1,7 @@
 runs/
-
+logs/
+# Ignore model checkpoints only for github
+checkpoints/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
-Cap'n Proto RPC Server for Agent Interface
-Receives observation as Agent.Tensor (no pickle).
+Cap'n Proto RPC Server for Agent Interface.
+
+Receives observations as structured Observation messages containing Tensor entries
+so agents can work with both state vectors and rich sensory data without pickle.
 """
 
 import asyncio
@@ -34,24 +36,29 @@ class AgentServer(agent_capnp.Agent.Server):
         self.logger.info("AgentServer initialized with agent: %s", type(agent).__name__)
 
     async def act(self, obs, **kwargs):
-        """Handle act RPC call. 'obs' is expected to be an Agent.Tensor struct."""
+        """Handle act RPC call. 'obs' is an Observation struct containing Tensor entries."""
         try:
-            # obs is a struct with .data, .shape, .dtype
-            byte_len = len(obs.data) if obs and obs.data is not None else 0
+            entries = list(obs.entries)
             self.logger.debug(
-                "Server.act invoked; incoming obs bytes=%d shape=%s dtype=%s",
-                byte_len,
-                list(obs.shape) if obs else None,
-                obs.dtype if obs else None,
+                "Server.act invoked; incoming observation entries=%d",
+                len(entries),
             )
 
-            # reconstruct numpy observation
-            obs_np = np.frombuffer(obs.data, dtype=np.dtype(obs.dtype)).reshape(
-                tuple(obs.shape)
-            )
+            def tensor_to_numpy(tensor_msg) -> np.ndarray:
+                array = np.frombuffer(
+                    tensor_msg.data, dtype=np.dtype(tensor_msg.dtype)
+                ).reshape(tuple(tensor_msg.shape))
+                return array.copy()
 
-            # call the underlying agent synchronously (user's agent.act should accept ndarray)
-            action_tensor = self.agent.act(obs_np)
+            if len(entries) == 1 and entries[0].key == "__value__":
+                obs_payload = tensor_to_numpy(entries[0].tensor)
+            else:
+                obs_payload = {
+                    entry.key: tensor_to_numpy(entry.tensor) for entry in entries
+                }
+
+            # call the underlying agent synchronously
+            action_tensor = self.agent.act(obs_payload)
 
             # convert to numpy
             if isinstance(action_tensor, torch.Tensor):
