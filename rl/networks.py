@@ -1,15 +1,21 @@
 from collections.abc import Callable
 from functools import cached_property, partial
+from typing import Mapping
 
 import distrax
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
+from flax import struct
+from flax.core import FrozenDict
+from flax.core.frozen_dict import freeze
 from jaxtyping import PRNGKeyArray
 
 from config.networks import (
     ContinuousActionPolicyConfig,
     QValueFunctionConfig,
+    ObservationFusionConfig,
+    PixelEncoderConfig,
     RecurrentContinuousActionPolicyConfig,
     ValueFunctionConfig,
 )
@@ -344,3 +350,122 @@ class EnsembleMD(nn.Module):
             lambda x: jnp.broadcast_to(x, (self.num,) + x.shape), params
         )["params"]
         return nn.FrozenDict({"params": {"ensemble": inner_params}})
+
+
+@struct.dataclass
+class EncoderOutputs:
+    """Container for multi-modal encoder outputs."""
+
+    latent: jax.Array
+    vision: jax.Array
+    per_view: FrozenDict[str, jax.Array]
+    proprio: jax.Array
+    task: jax.Array
+
+
+class PixelBackbone(nn.Module):
+    """Shared DrQ-style convolutional encoder for pixel observations."""
+
+    config: PixelEncoderConfig
+
+    def _get_stride(self, idx: int) -> int:
+        strides = self.config.strides
+        if isinstance(strides, (tuple, list)):
+            if idx < len(strides):
+                return int(strides[idx])
+            return int(strides[-1])
+        return int(strides)
+
+    def _get_filters(self, idx: int) -> int:
+        num_filters = self.config.num_filters
+        if isinstance(num_filters, (tuple, list)):
+            if idx < len(num_filters):
+                return int(num_filters[idx])
+            return int(num_filters[-1])
+        return int(num_filters)
+
+    @nn.compact
+    def __call__(self, x: jax.Array) -> jax.Array:
+        x = x.astype(jnp.float32) / 255.0
+        for idx in range(self.config.num_layers):
+            features = self._get_filters(idx)
+            stride = self._get_stride(idx)
+            x = nn.Conv(
+                features=features,
+                kernel_size=(self.config.kernel_size, self.config.kernel_size),
+                strides=(stride, stride),
+                padding="SAME",
+                use_bias=self.config.use_bias,
+                name=f"conv_{idx}",
+            )(x)
+            x = self.config.activation(x)
+        x = x.reshape((x.shape[0], -1))
+        x = nn.Dense(self.config.feature_dim, use_bias=self.config.use_bias)(x)
+        x = self.config.activation(x)
+        x = self.config.output_activation(x)
+        return x
+
+
+class ObservationEncoder(nn.Module):
+    """Fuses multi-view images, proprioception, and task ids into latent features."""
+
+    config: ObservationFusionConfig
+
+    def setup(self) -> None:
+        self.pixel_backbone = PixelBackbone(self.config.pixel_encoder)
+        self.proprio_encoder = get_nn_arch_for_config(
+            self.config.proprio_encoder.network_config
+        )(
+            config=self.config.proprio_encoder.network_config,
+            head_dim=self.config.proprio_encoder.output_dim,
+            activate_last=True,
+        )
+        self.task_encoder = nn.Dense(
+            self.config.task_embedding.embedding_dim,
+            use_bias=True,
+            name="task_embedding",
+        )
+        self.fusion = get_nn_arch_for_config(self.config.fusion_mlp)(
+            config=self.config.fusion_mlp,
+            head_dim=self.config.latent_dim,
+            activate_last=True,
+        )
+
+    def __call__(
+        self,
+        *,
+        images: Mapping[str, jax.Array],
+        proprio: jax.Array,
+        task_one_hot: jax.Array,
+    ) -> EncoderOutputs:
+        per_view_features: dict[str, jax.Array] = {}
+        stacked_features = []
+
+        for name in self.config.view_names:
+            if name not in images:
+                raise KeyError(f"Missing camera view '{name}' in observation")
+            view = images[name]
+            if view.ndim == 3:
+                view = view[None, ...]
+            feats = self.pixel_backbone(view)
+            per_view_features[name] = feats
+            stacked_features.append(feats)
+
+        vision = jnp.concatenate(stacked_features, axis=-1)
+
+        proprio_feat = self.proprio_encoder(proprio)
+        proprio_feat = self.config.proprio_encoder.activation(proprio_feat)
+
+        task_feat = self.task_encoder(task_one_hot.astype(jnp.float32))
+        task_feat = self.config.task_embedding.activation(task_feat)
+
+        fused_input = jnp.concatenate([vision, proprio_feat, task_feat], axis=-1)
+        latent = self.fusion(fused_input)
+
+        return EncoderOutputs(
+            latent=latent,
+            vision=vision,
+            per_view=freeze(per_view_features),
+            proprio=proprio_feat,
+            task=task_feat,
+        )

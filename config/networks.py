@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 
-from config.utils import Initializer, StdType
+from typing import Sequence, Tuple
+
+from config.utils import Activation, Initializer, StdType
 
 from .nn import NeuralNetworkConfig, RecurrentNeuralNetworkConfig, VanillaNetworkConfig
 
@@ -76,3 +78,48 @@ class QValueFunctionConfig:
 
 @dataclass(frozen=True)
 class ValueFunctionConfig(QValueFunctionConfig): ...
+
+
+@dataclass(frozen=True)
+class PixelEncoderConfig:
+    """Configuration for the shared DrQ-style convolutional encoder."""
+
+    feature_dim: int = 256
+    num_layers: int = 4
+    num_filters: int = 32
+    kernel_size: int = 3
+    strides: Sequence[int] = (2, 1, 1, 1)
+    activation: Activation = Activation.ReLU
+    use_bias: bool = True
+    layer_norm: bool = False
+    channels_last: bool = True
+    output_activation: Activation = Activation.Identity
+
+
+@dataclass(frozen=True)
+class ProprioEncoderConfig:
+    """Configuration for the proprioceptive MLP encoder."""
+
+    network_config: VanillaNetworkConfig = VanillaNetworkConfig(width=256, depth=2)
+    output_dim: int = 128
+    activation: Activation = Activation.ReLU
+
+
+@dataclass(frozen=True)
+class TaskEmbeddingConfig:
+    """Configuration for embedding task one-hot vectors."""
+
+    embedding_dim: int = 64
+    activation: Activation = Activation.ReLU
+
+
+@dataclass(frozen=True)
+class ObservationFusionConfig:
+    """Configuration for combining image, proprio, and task features."""
+
+    pixel_encoder: PixelEncoderConfig = PixelEncoderConfig()
+    proprio_encoder: ProprioEncoderConfig = ProprioEncoderConfig()
+    task_embedding: TaskEmbeddingConfig = TaskEmbeddingConfig()
+    fusion_mlp: VanillaNetworkConfig = VanillaNetworkConfig(width=512, depth=2)
+    latent_dim: int = 256
+    view_names: Tuple[str, ...] = ("corner", "corner2", "topview")
