@@ -10,7 +10,7 @@ from typing import Dict, Optional
 import gymnasium as gym
 import metaworld
 import numpy as np
-from agent import RLAgent  # PPO agent
+from agent import RLAgent
 from envs.wrappers import MetaWorldPixelObservationWrapper
 
 try:

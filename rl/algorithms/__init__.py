@@ -30,4 +30,10 @@ __all__ = [
     "PPO",
     "MTSACConfig",
     "PPOConfig",
+    "SAC",
+    "SACConfig",
+    "MAMLTRPO",
+    "MAMLTRPOConfig",
+    "RL2",
+    "RL2Config",
 ]

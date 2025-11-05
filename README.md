@@ -1,4 +1,4 @@
-# PPO Agent for Kinitro MetaWorld MT10 Challenge
+# MetaWorld Agent Migration (PPO → SAC + DrQ-v2)
 ## Installation
 
 ### Prerequisites
@@ -15,9 +15,9 @@ uv sync
 ```
 
 ### Training a Model
-```bash
-python train --seed 42
-```
+
+> ⚠️ The legacy PPO trainer has been removed. A new SAC + DrQ-v2 training
+> pipeline is under construction and will land in an upcoming update.
 
 
 #### Local Evaluation
@@ -39,26 +39,13 @@ peg-insert-side-v3
 lever-pull-v3
 ```
 
-## PPO (Proximal Policy Optimization) Details
-- **Configuration**: Multi-task learning on MT50
-- **Features**: GAE, value function clipping, KL divergence constraint
-- **Network**: Continuous action policy with vanilla MLP architecture
-- **Training**: 16 epochs, 32 gradient steps per update
-
-
-### Key Parameters
-
-```python
-# PPO Configuration
-ppo_config = PPOConfig(
-    num_tasks=50,           # Multi-task learning
-    gamma=0.99,             # Discount factor
-    gae_lambda=0.97,        # GAE parameter
-    num_epochs=16,          # Training epochs
-    num_gradient_steps=32,  # Gradient steps per update
-    target_kl=None,         # KL divergence constraint
-)
-```
+## Roadmap
+- ✅ Enable multi-view pixel observations (corner, corner2, topview) alongside
+  proprioception and task one-hot inputs.
+- 🚧 Replace the PPO baseline with a SAC + DrQ-v2 implementation tuned for
+  MetaWorld MT10 multi-task learning.
+- 🔜 Reintroduce end-to-end training and evaluation documentation once the new
+  agent lands.
 
 ### TensorBoard Integration
 ```bash
