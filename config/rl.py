@@ -1,6 +1,13 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from config.networks import (
+    ContinuousActionPolicyConfig,
+    ObservationFusionConfig,
+    QValueFunctionConfig,
+)
+from config.optim import OptimizerConfig
+
 if TYPE_CHECKING:
     from rl.algorithms.base import Algorithm
 
@@ -35,6 +42,22 @@ class OffPolicyTrainingConfig(TrainingConfig):
 @dataclass(frozen=True)
 class OnPolicyTrainingConfig(TrainingConfig):
     rollout_steps: int = 10_000
+
+
+@dataclass(frozen=True)
+class DrQSACConfig(AlgorithmConfig):
+    fusion_config: ObservationFusionConfig = ObservationFusionConfig()
+    actor_config: ContinuousActionPolicyConfig = ContinuousActionPolicyConfig()
+    critic_config: QValueFunctionConfig = QValueFunctionConfig()
+    encoder_optimizer: OptimizerConfig = OptimizerConfig()
+    actor_optimizer: OptimizerConfig = OptimizerConfig()
+    critic_optimizer: OptimizerConfig = OptimizerConfig()
+    temperature_optimizer: OptimizerConfig = OptimizerConfig(max_grad_norm=None)
+    initial_temperature: float = 1.0
+    num_critics: int = 2
+    tau: float = 0.01
+    augmentation_pad: int = 4
+    channels_last: bool = True
 
 
 @dataclass(frozen=True)

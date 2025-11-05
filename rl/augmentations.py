@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Mapping
+from typing import Mapping, Sequence
 
 import jax
 import jax.numpy as jnp
+from flax.core import freeze
 
 
 def random_shift(
@@ -56,9 +57,10 @@ def random_shift_views(
     key: jax.Array,
     images: Mapping[str, jax.Array],
     *,
+    view_names: Sequence[str],
     pad: int = 4,
     channels_last: bool = True,
-) -> dict[str, jax.Array]:
+):
     """Apply identical random shifts across multiple camera views.
 
     Args:
@@ -74,14 +76,18 @@ def random_shift_views(
     if not images:
         raise ValueError("images mapping must not be empty")
 
-    first_view = next(iter(images.values()))
+    if not view_names:
+        raise ValueError("view_names must not be empty")
+
+    first_view = images[view_names[0]]
     batch = first_view.shape[0]
     max_offset = 2 * pad + 1
     offsets = jax.random.randint(key, (batch, 2), 0, max_offset)
-    augmented = {}
-    for name, view in images.items():
-        augmented[name] = _random_shift_with_offsets(view, offsets, pad, channels_last)
-    return augmented
+    augmented = {
+        name: _random_shift_with_offsets(images[name], offsets, pad, channels_last)
+        for name in view_names
+    }
+    return freeze(augmented)
 
 
 def _random_shift_with_offsets(

@@ -4,6 +4,7 @@ from typing import override
 import gymnasium as gym
 import numpy as np
 import numpy.typing as npt
+from flax.core import freeze
 from jaxtyping import Float
 
 from metaworld_types import (
@@ -52,8 +53,8 @@ class AbstractReplayBuffer(abc.ABC):
     @abc.abstractmethod
     def add(
         self,
-        obs: Observation,
-        next_obs: Observation,
+        obs,
+        next_obs,
         action: Action,
         reward: Float[npt.NDArray, " *batch"],
         done: Float[npt.NDArray, " *batch"],
@@ -62,7 +63,7 @@ class AbstractReplayBuffer(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def sample(self, batch_size: int) -> ReplayBufferSamples: ...
+    def sample(self, batch_size: int): ...
 
 
 class ReplayBuffer(AbstractReplayBuffer):
@@ -400,9 +401,9 @@ class PixelReplayBuffer(AbstractReplayBuffer):
         }
 
         return PixelReplayBufferSamples(
-            observations=observations,
+            observations=freeze(observations),
             actions=self.actions[indices],
-            next_observations=next_observations,
+            next_observations=freeze(next_observations),
             dones=self.dones[indices],
             rewards=self.rewards[indices],
         )
