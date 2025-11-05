@@ -9,6 +9,7 @@ from jaxtyping import Float
 from metaworld_types import (
     Action,
     Observation,
+    PixelReplayBufferSamples,
     RNNState,
     ReplayBufferCheckpoint,
     ReplayBufferSamples,
@@ -199,6 +200,212 @@ class ReplayBuffer(AbstractReplayBuffer):
         )
 
         return ReplayBufferSamples(*batch)
+
+
+class PixelReplayBuffer(AbstractReplayBuffer):
+    """Replay buffer that stores structured pixel observations."""
+
+    def __init__(
+        self,
+        capacity: int,
+        env_obs_space: gym.Space,
+        env_action_space: gym.Space,
+        seed: int | None = None,
+    ) -> None:
+        if not isinstance(env_obs_space, gym.spaces.Dict):
+            raise ValueError("PixelReplayBuffer requires a Dict observation space")
+
+        if "images" not in env_obs_space or not isinstance(
+            env_obs_space["images"], gym.spaces.Dict
+        ):
+            raise ValueError(
+                "PixelReplayBuffer expects an observation space with an 'images' subspace"
+            )
+
+        self.capacity = capacity
+        self._rng = np.random.default_rng(seed)
+        self.full = False
+        self.size = 0
+        self.pos = 0
+
+        image_space: gym.spaces.Dict = env_obs_space["images"]
+        self.view_names = tuple(image_space.spaces.keys())
+        self.image_shapes = {
+            name: tuple(space.shape) for name, space in image_space.spaces.items()
+        }
+        self.image_dtypes = {
+            name: getattr(space, "dtype", np.uint8) for name, space in image_space.spaces.items()
+        }
+
+        proprio_space = env_obs_space.get("proprio")
+        if proprio_space is None or not isinstance(proprio_space, gym.spaces.Box):
+            raise ValueError("PixelReplayBuffer requires a 'proprio' Box space")
+        self.proprio_shape = tuple(proprio_space.shape)
+
+        task_space = env_obs_space.get("task_one_hot")
+        if task_space is None or not isinstance(task_space, gym.spaces.Box):
+            raise ValueError("PixelReplayBuffer requires a 'task_one_hot' Box space")
+        self.task_shape = tuple(task_space.shape)
+
+        self.action_dim = int(np.prod(env_action_space.shape))
+
+        self.reset()
+
+    @override
+    def reset(self) -> None:
+        self.obs_images = {
+            name: np.zeros((self.capacity,) + shape, dtype=self.image_dtypes[name])
+            for name, shape in self.image_shapes.items()
+        }
+        self.next_images = {
+            name: np.zeros((self.capacity,) + shape, dtype=self.image_dtypes[name])
+            for name, shape in self.image_shapes.items()
+        }
+        self.obs_proprio = np.zeros((self.capacity,) + self.proprio_shape, dtype=np.float32)
+        self.next_proprio = np.zeros((self.capacity,) + self.proprio_shape, dtype=np.float32)
+        self.obs_task = np.zeros((self.capacity,) + self.task_shape, dtype=np.float32)
+        self.next_task = np.zeros((self.capacity,) + self.task_shape, dtype=np.float32)
+        self.actions = np.zeros((self.capacity, self.action_dim), dtype=np.float32)
+        self.rewards = np.zeros((self.capacity, 1), dtype=np.float32)
+        self.dones = np.zeros((self.capacity, 1), dtype=np.float32)
+        self.pos = 0
+        self.size = 0
+        self.full = False
+
+    @override
+    def checkpoint(self) -> ReplayBufferCheckpoint:
+        return {
+            "data": {
+                "obs_images": self.obs_images,
+                "next_images": self.next_images,
+                "obs_proprio": self.obs_proprio,
+                "next_proprio": self.next_proprio,
+                "obs_task": self.obs_task,
+                "next_task": self.next_task,
+                "actions": self.actions,
+                "rewards": self.rewards,
+                "dones": self.dones,
+                "pos": self.pos,
+                "size": self.size,
+                "full": self.full,
+            },
+            "rng_state": self._rng.bit_generator.state,
+        }
+
+    @override
+    def load_checkpoint(self, ckpt: ReplayBufferCheckpoint) -> None:
+        data = ckpt["data"]
+        self.obs_images = data["obs_images"]
+        self.next_images = data["next_images"]
+        self.obs_proprio = data["obs_proprio"]
+        self.next_proprio = data["next_proprio"]
+        self.obs_task = data["obs_task"]
+        self.next_task = data["next_task"]
+        self.actions = data["actions"]
+        self.rewards = data["rewards"]
+        self.dones = data["dones"]
+        self.pos = data["pos"]
+        self.size = data["size"]
+        self.full = data["full"]
+        self._rng.bit_generator.state = ckpt["rng_state"]
+
+    def _ensure_batch(self, array: np.ndarray, expected_shape: tuple[int, ...]) -> np.ndarray:
+        arr = np.asarray(array)
+        if arr.shape == expected_shape:
+            arr = arr[None, ...]
+        return arr
+
+    def _normalize_observation(self, obs: dict) -> tuple[dict[str, np.ndarray], np.ndarray, np.ndarray]:
+        images = {}
+        for name in self.view_names:
+            if name not in obs["images"]:
+                raise KeyError(f"Observation missing image view '{name}'")
+            img = np.asarray(obs["images"][name])
+            if img.shape == self.image_shapes[name]:
+                img = img[None, ...]
+            images[name] = img.astype(self.image_dtypes[name], copy=False)
+
+        proprio = np.asarray(obs["proprio"], dtype=np.float32)
+        if proprio.shape == self.proprio_shape:
+            proprio = proprio[None, ...]
+
+        task = np.asarray(obs["task_one_hot"], dtype=np.float32)
+        if task.shape == self.task_shape:
+            task = task[None, ...]
+
+        return images, proprio, task
+
+    @override
+    def add(
+        self,
+        obs: dict,
+        next_obs: dict,
+        action: Action,
+        reward: Float[npt.NDArray, " *batch"],
+        done: Float[npt.NDArray, " *batch"],
+    ) -> None:
+        obs_images, obs_proprio, obs_task = self._normalize_observation(obs)
+        next_images, next_proprio, next_task = self._normalize_observation(next_obs)
+
+        action_arr = np.asarray(action, dtype=np.float32)
+        if action_arr.ndim == 1:
+            action_arr = action_arr[None, ...]
+        reward_arr = np.asarray(reward, dtype=np.float32)
+        if reward_arr.ndim == 1:
+            reward_arr = reward_arr[..., None]
+        done_arr = np.asarray(done, dtype=np.float32)
+        if done_arr.ndim == 1:
+            done_arr = done_arr[..., None]
+
+        batch_size = action_arr.shape[0]
+        indices = (self.pos + np.arange(batch_size)) % self.capacity
+
+        for name in self.view_names:
+            self.obs_images[name][indices] = obs_images[name]
+            self.next_images[name][indices] = next_images[name]
+
+        self.obs_proprio[indices] = obs_proprio
+        self.next_proprio[indices] = next_proprio
+        self.obs_task[indices] = obs_task
+        self.next_task[indices] = next_task
+        self.actions[indices] = action_arr.reshape(batch_size, -1)
+        self.rewards[indices] = reward_arr.reshape(batch_size, -1)
+        self.dones[indices] = done_arr.reshape(batch_size, -1)
+
+        self.pos = (self.pos + batch_size) % self.capacity
+        self.size = min(self.size + batch_size, self.capacity)
+        if self.size == self.capacity:
+            self.full = True
+
+    @override
+    def sample(self, batch_size: int) -> PixelReplayBufferSamples:
+        if self.size == 0:
+            raise ValueError("Cannot sample from an empty replay buffer")
+        indices = self._rng.integers(low=0, high=self.size, size=(batch_size,))
+
+        obs_images = {name: self.obs_images[name][indices] for name in self.view_names}
+        next_images = {
+            name: self.next_images[name][indices] for name in self.view_names
+        }
+
+        observations = {
+            "images": obs_images,
+            "proprio": self.obs_proprio[indices],
+            "task_one_hot": self.obs_task[indices],
+        }
+        next_observations = {
+            "images": next_images,
+            "proprio": self.next_proprio[indices],
+            "task_one_hot": self.next_task[indices],
+        }
+
+        return PixelReplayBufferSamples(
+            observations=observations,
+            actions=self.actions[indices],
+            next_observations=next_observations,
+            dones=self.dones[indices],
+            rewards=self.rewards[indices],
+        )
 
 
 class MultiTaskReplayBuffer(AbstractReplayBuffer):

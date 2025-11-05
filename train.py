@@ -6,7 +6,9 @@ import argparse
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Train the next-generation MetaWorld agent.")
+    parser = argparse.ArgumentParser(
+        description="Train the next-generation MetaWorld agent."
+    )
     parser.add_argument(
         "--pixel-observations",
         action="store_true",
@@ -24,4 +26,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-*** End of File

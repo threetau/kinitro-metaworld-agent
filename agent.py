@@ -34,5 +34,3 @@ class RLAgent(AgentInterface):
     def reset(self, seed: Optional[int] = None) -> None:
         if seed is not None:
             self.seed = seed
-
-*** End of File

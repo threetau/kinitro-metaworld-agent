@@ -27,6 +27,17 @@ class ReplayBufferSamples(NamedTuple):
     rewards: Float[np.ndarray, "batch 1"]
 
 
+type PixelObservationDict = dict[str, Any]
+
+
+class PixelReplayBufferSamples(NamedTuple):
+    observations: PixelObservationDict
+    actions: Float[Action, " batch"]
+    next_observations: PixelObservationDict
+    dones: Float[np.ndarray, "batch 1"]
+    rewards: Float[np.ndarray, "batch 1"]
+
+
 class Rollout(NamedTuple):
     # Standard timestep data
     observations: Float[Observation, "timestep task"]
@@ -115,7 +126,7 @@ class RNGCheckpoint(TypedDict):
 
 
 class ReplayBufferCheckpoint(TypedDict):
-    data: dict[str, npt.NDArray[np.float32] | int | bool]
+    data: dict[str, Any]
     rng_state: Any
 
 
