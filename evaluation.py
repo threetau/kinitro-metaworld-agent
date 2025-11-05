@@ -11,6 +11,7 @@ import gymnasium as gym
 import metaworld
 import numpy as np
 from agent import RLAgent  # PPO agent
+from envs.wrappers import MetaWorldPixelObservationWrapper
 
 try:
     from torch.utils.tensorboard import SummaryWriter
@@ -34,6 +35,10 @@ class AgentEvaluator:
         use_tensorboard: bool = True,
         log_dir: Optional[str | Path] = None,
         model_path: Optional[str | Path] = None,
+        pixel_observations: bool = False,
+        image_shape: tuple[int, int, int] = (84, 84, 3),
+        camera_names: tuple[str, str, str] = ("corner", "corner2", "topview"),
+        task_one_hot_dim: int = 10,
     ):
         """
         Initialize the evaluator.
@@ -62,6 +67,10 @@ class AgentEvaluator:
             self.model_path = None
         self.env = None
         self.agent = None
+        self.pixel_observations = pixel_observations
+        self.image_shape = image_shape
+        self.camera_names = camera_names
+        self.task_one_hot_dim = task_one_hot_dim
 
         # Statistics tracking
         self.episode_rewards: list[float] = []
@@ -115,6 +124,18 @@ class AgentEvaluator:
             # Wrap with gymnasium if needed
             if not isinstance(env, gym.Env):
                 env = gym.make(env.spec.id if hasattr(env, "spec") else self.task_name)
+
+            if self.pixel_observations:
+                try:
+                    env.render_mode = "rgb_array"
+                except Exception:
+                    pass
+                env = MetaWorldPixelObservationWrapper(
+                    env,
+                    camera_names=self.camera_names,
+                    task_one_hot_dim=self.task_one_hot_dim,
+                    image_shape=self.image_shape,
+                )
 
             # Configure rendering
             if hasattr(env, "render_mode"):
@@ -429,6 +450,7 @@ class Args:
     log_dir: Optional[Path] = None
     model_path: Optional[Path] = None
     no_tensorboard: bool = False
+    pixels: bool = False
 
 
 def parse_args() -> Args:
@@ -493,6 +515,12 @@ def parse_args() -> Args:
         help="Disable TensorBoard logging",
     )
     parser.add_argument(
+        "--pixels",
+        action="store_true",
+        default=Args.pixels,
+        help="Enable pixel observations (multi-view RGB cameras)",
+    )
+    parser.add_argument(
         "--list-tasks",
         action="store_true",
         default=Args.list_tasks,
@@ -511,6 +539,7 @@ def parse_args() -> Args:
         log_dir=parsed.log_dir,
         model_path=parsed.model_path,
         no_tensorboard=parsed.no_tensorboard,
+        pixels=parsed.pixels,
     )
 
 
@@ -532,6 +561,7 @@ def main():
         use_tensorboard=not args.no_tensorboard,
         log_dir=args.log_dir,
         model_path=args.model_path,
+        pixel_observations=args.pixels,
     )
 
     if args.list_tasks:

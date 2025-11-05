@@ -6,6 +6,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import torch
+import gymnasium as gym
 from agent_interface import AgentInterface
 from checkpoint import get_checkpoint_restore_args
 from envs.metaworld import MetaworldConfig
@@ -101,7 +102,21 @@ class RLAgent(AgentInterface):
             # Initialize the PPO agent
             self.ppo_agent = PPO.initialize(ppo_config, env_config, seed=self.seed)
             obs_space = env_config.observation_space
-            if hasattr(obs_space, "shape") and obs_space.shape is not None:
+            if isinstance(obs_space, gym.spaces.Dict):
+                proprio_space = obs_space.get("proprio")
+                task_space = obs_space.get("task_one_hot")
+                proprio_dim = (
+                    int(np.prod(proprio_space.shape))
+                    if proprio_space is not None and proprio_space.shape is not None
+                    else 0
+                )
+                task_dim = (
+                    int(np.prod(task_space.shape))
+                    if task_space is not None and task_space.shape is not None
+                    else 0
+                )
+                self.expected_obs_dim = proprio_dim + task_dim
+            elif hasattr(obs_space, "shape") and obs_space.shape is not None:
                 self.expected_obs_dim = int(np.prod(obs_space.shape))
             else:
                 self.expected_obs_dim = None
@@ -350,21 +365,35 @@ class RLAgent(AgentInterface):
             Processed observation as numpy array
         """
         if isinstance(observation, dict):
-            # Wrapper exposes trimmed state with task one-hot under "observation.state"
-            if "observation.state" in observation:
+            if "proprio" in observation:
+                obs_parts = [np.array(observation["proprio"], dtype=np.float32).reshape(-1)]
+                if "task_one_hot" in observation:
+                    task_oh = np.array(
+                        observation["task_one_hot"], dtype=np.float32
+                    ).reshape(-1)
+                else:
+                    task_oh = np.array([], dtype=np.float32)
+                if task_oh.size:
+                    obs_parts.append(task_oh)
+                obs = np.concatenate(obs_parts) if obs_parts else np.array((), dtype=np.float32)
+            elif "observation.state" in observation:
                 obs = observation["observation.state"]
             else:
-                # Fallback for environments without wrapped dict observations
                 obs = observation.get(
                     "state", observation.get("observation", observation)
                 )
                 if isinstance(obs, dict):
-                    obs = np.concatenate(list(obs.values()))
+                    filtered = [
+                        np.array(value, dtype=np.float32).reshape(-1)
+                        for key, value in obs.items()
+                        if not key.startswith("images")
+                    ]
+                    obs = np.concatenate(filtered) if filtered else np.array([], dtype=np.float32)
         else:
             obs = observation
 
         # Ensure it's a numpy array
-        obs = np.array(obs, dtype=np.float32)
+        obs = np.array(obs, dtype=np.float32, copy=False)
 
         if obs.ndim > 1:
             obs = obs.flatten()

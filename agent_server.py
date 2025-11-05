@@ -27,6 +27,18 @@ DEFAULT_RPC_PORT = 8000
 _TRAVERSAL_WORDS = 100 * 1024 * 1024  # match client; tune appropriately
 
 
+def _assign_nested(container: dict, key_path: list[str], value) -> None:
+    """Assign a value to a nested dictionary following the provided key path."""
+    if not key_path:
+        raise ValueError("Observation entry key path cannot be empty")
+    current = container
+    for key in key_path[:-1]:
+        if key not in current or not isinstance(current[key], dict):
+            current[key] = {}
+        current = current[key]
+    current[key_path[-1]] = value
+
+
 class AgentServer(agent_capnp.Agent.Server):
     """Cap'n Proto server implementation for AgentInterface"""
 
@@ -53,9 +65,10 @@ class AgentServer(agent_capnp.Agent.Server):
             if len(entries) == 1 and entries[0].key == "__value__":
                 obs_payload = tensor_to_numpy(entries[0].tensor)
             else:
-                obs_payload = {
-                    entry.key: tensor_to_numpy(entry.tensor) for entry in entries
-                }
+                obs_payload = {}
+                for entry in entries:
+                    key_path = entry.key.split(".") if entry.key else []
+                    _assign_nested(obs_payload, key_path, tensor_to_numpy(entry.tensor))
 
             # call the underlying agent synchronously
             action_tensor = self.agent.act(obs_payload)

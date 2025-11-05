@@ -11,6 +11,11 @@ from metaworld_types import Agent, MetaLearningAgent, GymVectorEnv
 from config.envs import EnvConfig, MetaLearningEnvConfig
 from metaworld.evaluation import evaluation, metalearning_evaluation
 
+from .wrappers import (
+    MetaWorldPixelObservationWrapper,
+    MetaWorldVectorPixelObservationWrapper,
+)
+
 
 @dataclass(frozen=True)
 class MetaworldConfig(EnvConfig):
@@ -19,6 +24,10 @@ class MetaworldConfig(EnvConfig):
     reward_normalization_method: str | None = None
     normalize_observations: bool = False
     env_name: str | None = None
+    pixel_observations: bool = False
+    camera_names: tuple[str, str, str] = ("corner", "corner2", "topview")
+    image_shape: tuple[int, int, int] = (84, 84, 3)
+    channels_last: bool = True
 
     @cached_property
     @override
@@ -30,7 +39,7 @@ class MetaworldConfig(EnvConfig):
 
     @cached_property
     @override
-    def observation_space(self) -> gym.Space:
+    def _base_observation_space(self) -> gym.Space:
         _HAND_SPACE = gym.spaces.Box(
             np.array([-0.525, 0.348, -0.0525]),
             np.array([+0.525, 1.025, 0.7]),
@@ -80,13 +89,7 @@ class MetaworldConfig(EnvConfig):
         )
 
         if self.use_one_hot:
-            num_tasks = 1
-            if self.env_id == "MT10":
-                num_tasks = 10
-            if self.env_id == "MT25":
-                num_tasks = 25
-            if self.env_id == "MT50":
-                num_tasks = 50
+            num_tasks = self._infer_num_tasks()
             one_hot_ub = np.ones(num_tasks)
             one_hot_lb = np.zeros(num_tasks)
 
@@ -98,6 +101,64 @@ class MetaworldConfig(EnvConfig):
 
         return env_obs_space
 
+    @cached_property
+    @override
+    def observation_space(self) -> gym.Space:
+        if not self.pixel_observations:
+            return self._base_observation_space()
+
+        base_space = self._base_observation_space()
+        assert isinstance(base_space, gym.spaces.Box)
+
+        obs_dim = int(np.prod(base_space.shape))
+        task_dim = self.task_one_hot_dim if self.use_one_hot else 0
+        proprio_dim = obs_dim - task_dim
+
+        if not self.channels_last:
+            c_last_shape = (self.image_shape[2], self.image_shape[0], self.image_shape[1])
+        else:
+            c_last_shape = self.image_shape
+
+        image_spaces = {
+            name: gym.spaces.Box(
+                low=0,
+                high=255,
+                shape=c_last_shape,
+                dtype=np.uint8,
+            )
+            for name in self.camera_names
+        }
+
+        return gym.spaces.Dict(
+            {
+                "images": gym.spaces.Dict(image_spaces),
+                "proprio": gym.spaces.Box(
+                    low=-np.inf,
+                    high=np.inf,
+                    shape=(proprio_dim,),
+                    dtype=np.float32,
+                ),
+                "task_one_hot": gym.spaces.Box(
+                    low=0.0,
+                    high=1.0,
+                    shape=(task_dim,),
+                    dtype=np.float32,
+                ),
+            }
+        )
+
+    @cached_property
+    def task_one_hot_dim(self) -> int:
+        if not self.use_one_hot:
+            return 0
+        return self._infer_num_tasks()
+
+    def _infer_num_tasks(self) -> int:
+        env_id = self.env_id.upper()
+        if env_id.startswith("MT") and env_id[2:].isdigit():
+            return int(env_id[2:])
+        return 1
+
     @override
     def evaluate(
         self, envs: GymVectorEnv, agent: Agent
@@ -106,7 +167,11 @@ class MetaworldConfig(EnvConfig):
 
     @override
     def spawn(self, seed: int = 1) -> GymVectorEnv:
-        return gym.make_vec(  # pyright: ignore[reportReturnType]
+        render_kwargs = (
+            {"render_mode": "rgb_array"} if self.pixel_observations else {}
+        )
+
+        vector_env = gym.make_vec(  # pyright: ignore[reportReturnType]
             f"Meta-World/{self.env_id}",
             seed=seed,
             use_one_hot=self.use_one_hot,
@@ -117,6 +182,21 @@ class MetaworldConfig(EnvConfig):
             num_goals=self.num_goals,
             reward_normalization_method=self.reward_normalization_method,
             normalize_observations=self.normalize_observations,
+            **render_kwargs,
+        )
+
+        return self._maybe_wrap_vector_env(vector_env)
+
+    def _maybe_wrap_vector_env(self, env: GymVectorEnv) -> GymVectorEnv:
+        if not self.pixel_observations:
+            return env
+
+        return MetaWorldVectorPixelObservationWrapper(
+            env,
+            camera_names=self.camera_names,
+            task_one_hot_dim=self.task_one_hot_dim,
+            image_shape=self.image_shape,
+            channels_last=self.channels_last,
         )
 
 
@@ -222,10 +302,13 @@ class MetaworldMetaLearningConfig(MetaworldConfig, MetaLearningEnvConfig):
         )
         if self.env_name:
             kwargs["env_name"] = self.env_name
-        return gym.make_vec(  # pyright: ignore[reportReturnType]
+        if self.pixel_observations:
+            kwargs["render_mode"] = "rgb_array"
+        env = gym.make_vec(  # pyright: ignore[reportReturnType]
             f"Meta-World/{self.env_id}-train",
             **kwargs,  # pyright: ignore[reportArgumentType]
         )
+        return self._maybe_wrap_vector_env(env)
 
     @override
     def spawn_test(self, seed: int = 1) -> GymVectorEnv:
@@ -243,7 +326,10 @@ class MetaworldMetaLearningConfig(MetaworldConfig, MetaLearningEnvConfig):
         )
         if self.env_name:
             kwargs["env_name"] = self.env_name
-        return gym.make_vec(  # pyright: ignore[reportReturnType]
+        if self.pixel_observations:
+            kwargs["render_mode"] = "rgb_array"
+        env = gym.make_vec(  # pyright: ignore[reportReturnType]
             f"Meta-World/{self.env_id}-test",
             **kwargs,  # pyright: ignore[reportArgumentType]
         )
+        return self._maybe_wrap_vector_env(env)

@@ -31,6 +31,7 @@ class Args:
     run_name: str | None = None
     num_tasks: int | None = None
     logs_dir: Path = Path("./logs")
+    pixel_observations: bool = False
 
 
 def parse_args() -> Args:
@@ -90,6 +91,12 @@ def parse_args() -> Args:
         default=Args.logs_dir,
         help="Directory to store TensorBoard logs (default: ./logs)",
     )
+    parser.add_argument(
+        "--pixel-observations",
+        action="store_true",
+        default=Args.pixel_observations,
+        help="Enable pixel observations with multi-view RGB cameras",
+    )
 
     parsed_args = parser.parse_args()
     return Args(
@@ -102,6 +109,7 @@ def parse_args() -> Args:
         run_name=parsed_args.run_name,
         num_tasks=parsed_args.num_tasks,
         logs_dir=parsed_args.logs_dir,
+        pixel_observations=parsed_args.pixel_observations,
     )
 
 
@@ -199,7 +207,10 @@ def main() -> None:
     logger.info(f"Data directory: {data_dir}")
     logger.info(f"MetaWorld environment: {args.env_id}")
 
-    env_config = MetaworldConfig(env_id=args.env_id)
+    env_config = MetaworldConfig(
+        env_id=args.env_id,
+        pixel_observations=args.pixel_observations,
+    )
     num_tasks = (
         args.num_tasks if args.num_tasks is not None else infer_num_tasks(args.env_id)
     )
