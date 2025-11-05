@@ -33,7 +33,6 @@ from metaworld_types import (
     LogDict,
     PixelReplayBufferSamples,
 )
-import nn
 
 
 class EncoderTrainState(TrainState):
