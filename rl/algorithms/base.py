@@ -20,6 +20,7 @@ from config.rl import (
     RNNBasedMetaLearningTrainingConfig,
     TrainingConfig,
 )
+import envs
 from monitoring.utils import log
 from rl.buffers import (
     AbstractReplayBuffer,
@@ -165,6 +166,61 @@ class GradientBasedMetaLearningAlgorithm(
     ) -> Self:
         global_episodic_return: Deque[float] = deque([], maxlen=20 * self.num_tasks)
         global_episodic_length: Deque[int] = deque([], maxlen=20 * self.num_tasks)
+        task_names = getattr(env_config, "task_names", None) or ()
+        task_labels = tuple(
+            task_names[i] if i < len(task_names) else f"task_{i}"
+            for i in range(envs.num_envs)
+        )
+        per_task_returns: dict[str, Deque[float]] = {
+            name: deque([], maxlen=20) for name in task_labels
+        }
+        per_task_success: dict[str, Deque[float]] = {
+            name: deque([], maxlen=20) for name in task_labels
+        }
+        task_names = getattr(env_config, "task_names", None) or ()
+        task_labels = tuple(
+            task_names[i] if i < len(task_names) else f"task_{i}"
+            for i in range(envs.num_envs)
+        )
+        per_task_returns: dict[str, Deque[float]] = {
+            name: deque([], maxlen=20) for name in task_labels
+        }
+        per_task_success: dict[str, Deque[float]] = {
+            name: deque([], maxlen=20) for name in task_labels
+        }
+        task_names = getattr(env_config, "task_names", None) or ()
+        task_labels = tuple(
+            task_names[i] if i < len(task_names) else f"task_{i}"
+            for i in range(envs.num_envs)
+        )
+        per_task_returns: dict[str, Deque[float]] = {
+            name: deque([], maxlen=20) for name in task_labels
+        }
+        per_task_success: dict[str, Deque[float]] = {
+            name: deque([], maxlen=20) for name in task_labels
+        }
+        task_names = getattr(env_config, "task_names", None) or ()
+        task_labels = tuple(
+            task_names[i] if i < len(task_names) else f"task_{i}"
+            for i in range(envs.num_envs)
+        )
+        per_task_returns: dict[str, Deque[float]] = {
+            name: deque([], maxlen=20) for name in task_labels
+        }
+        per_task_success: dict[str, Deque[float]] = {
+            name: deque([], maxlen=20) for name in task_labels
+        }
+        task_names = getattr(env_config, "task_names", None) or ()
+        task_labels = tuple(
+            task_names[i] if i < len(task_names) else f"task_{i}"
+            for i in range(envs.num_envs)
+        )
+        per_task_returns: dict[str, Deque[float]] = {
+            name: deque([], maxlen=20) for name in task_labels
+        }
+        per_task_success: dict[str, Deque[float]] = {
+            name: deque([], maxlen=20) for name in task_labels
+        }
         start_step, episodes_ended = 0, 0
 
         if checkpoint_metadata is not None:
@@ -568,6 +624,15 @@ class OffPolicyAlgorithm(
         checkpoint_metadata: CheckpointMetadata | None = None,
         buffer_checkpoint: ReplayBufferCheckpoint | None = None,
     ) -> Self:
+
+        task_names = getattr(env_config, "task_names", None) or ()
+        task_labels = tuple(
+            task_names[i] if i < len(task_names) else f"task_{i}"
+            for i in range(envs.num_envs)
+        )
+        per_task_returns = {name: deque([], maxlen=20) for name in task_labels}
+        per_task_success = {name: deque([], maxlen=20) for name in task_labels}
+
         global_episodic_return: Deque[float] = deque([], maxlen=20 * self.num_tasks)
         global_episodic_length: Deque[int] = deque([], maxlen=20 * self.num_tasks)
 
@@ -597,12 +662,7 @@ class OffPolicyAlgorithm(
             next_obs, rewards, terminations, truncations, infos = envs.step(actions)
             done = np.logical_or(terminations, truncations)
 
-            buffer_obs = next_obs
-            if "final_obs" in infos:
-                buffer_obs = np.where(
-                    done[:, None], np.stack(infos["final_obs"]), next_obs
-                )
-            replay_buffer.add(obs, buffer_obs, actions, rewards, done)
+            replay_buffer.add(obs, next_obs, actions, rewards, done)
 
             obs = next_obs
 
@@ -614,6 +674,13 @@ class OffPolicyAlgorithm(
                     global_episodic_length.append(
                         infos["final_info"]["episode"]["l"][i]
                     )
+                    task_label = task_labels[i]
+                    per_task_returns[task_label].append(
+                        float(infos["final_info"]["episode"]["r"][i])
+                    )
+                    per_task_success[task_label].append(
+                        float(infos["final_info"]["success"][i])
+                    )
                     episodes_ended += 1
 
             if global_step % 500 == 0 and global_episodic_return:
@@ -621,6 +688,17 @@ class OffPolicyAlgorithm(
                     f"global_step={total_steps}, mean_episodic_return={np.mean(list(global_episodic_return))}"
                 )
                 if track:
+                    per_task_metrics: dict[str, float] = {}
+                    for label in task_labels:
+                        if per_task_returns[label]:
+                            per_task_metrics[
+                                f"charts/{label}_episodic_return"
+                            ] = float(np.mean(list(per_task_returns[label])))
+                        if per_task_success[label]:
+                            per_task_metrics[
+                                f"charts/{label}_success_rate"
+                            ] = float(np.mean(list(per_task_success[label])))
+
                     log(
                         {
                             "charts/mean_episodic_return": np.mean(
@@ -629,7 +707,8 @@ class OffPolicyAlgorithm(
                             "charts/mean_episodic_length": np.mean(
                                 list(global_episodic_length)
                             ),
-                        },
+                        }
+                        | per_task_metrics,
                         step=total_steps,
                     )
 

@@ -6,7 +6,8 @@ from typing import Iterable
 
 import gymnasium as gym
 import numpy as np
-from gymnasium.vector import VectorEnvWrapper
+import mujoco
+from gymnasium.vector import VectorWrapper
 from gymnasium.vector.utils import batch_space
 
 
@@ -24,6 +25,59 @@ def _split_observation(
         proprio = obs[..., :cut_index]
         task = obs[..., cut_index:]
     return proprio.astype(np.float32, copy=False), task.astype(np.float32, copy=False)
+
+
+class MetaWorldCameraRenderWrapper(gym.Wrapper):
+    """Allow passing camera arguments through Gym wrappers for MetaWorld envs."""
+
+    def __init__(self, env: gym.Env) -> None:
+        super().__init__(env)
+        self._camera_name_to_id: dict[str, int] = {}
+
+    def render(self, *args, **kwargs):
+        render_mode = kwargs.pop("render_mode", None)
+        mode = kwargs.pop("mode", None)
+        camera_name = kwargs.pop("camera_name", None)
+        target_mode = render_mode if render_mode is not None else mode
+
+        unwrapped = self.env.unwrapped
+        prev_mode = getattr(unwrapped, "render_mode", None)
+
+        if target_mode is not None:
+            setattr(unwrapped, "render_mode", target_mode)
+
+        if camera_name is not None:
+            camera_id = self._get_camera_id(camera_name)
+            renderer = getattr(unwrapped, "mujoco_renderer", None)
+            if renderer is None:
+                raise RuntimeError("MetaWorld env is missing a Mujoco renderer")
+            renderer.camera_id = camera_id
+
+        try:
+            return self.env.render(*args, **kwargs)
+        finally:
+            if target_mode is not None:
+                setattr(unwrapped, "render_mode", prev_mode)
+
+    def _get_camera_id(self, camera_name: str) -> int:
+        if camera_name in self._camera_name_to_id:
+            return self._camera_name_to_id[camera_name]
+
+        unwrapped = self.env.unwrapped
+        model = getattr(unwrapped, "model", None)
+        if model is None:
+            raise RuntimeError("MetaWorld env is missing a Mujoco model")
+
+        camera_id = mujoco.mj_name2id(
+            model,
+            mujoco.mjtObj.mjOBJ_CAMERA,
+            camera_name,
+        )
+        if camera_id < 0:
+            raise ValueError(f"Mujoco camera '{camera_name}' was not found in the model")
+
+        self._camera_name_to_id[camera_name] = camera_id
+        return camera_id
 
 
 class MetaWorldPixelObservationWrapper(gym.ObservationWrapper):
@@ -103,7 +157,7 @@ class MetaWorldPixelObservationWrapper(gym.ObservationWrapper):
         return frame.astype(np.uint8, copy=False)
 
 
-class MetaWorldVectorPixelObservationWrapper(VectorEnvWrapper):
+class MetaWorldVectorPixelObservationWrapper(VectorWrapper):
     """Vectorised variant that augments observations with multi-view images."""
 
     def __init__(
@@ -167,6 +221,20 @@ class MetaWorldVectorPixelObservationWrapper(VectorEnvWrapper):
     def reset(self, **kwargs):  # type: ignore[override]
         obs, info = self.env.reset(**kwargs)
         return self._augment(obs), info
+
+    def call(self, name: str, *args, **kwargs):  # type: ignore[override]
+        if hasattr(self.env, "call"):
+            return self.env.call(name, *args, **kwargs)
+        raise AttributeError(f"{type(self).__name__} has no attribute 'call'")
+
+    def get_attr(self, name: str):
+        if hasattr(self.env, "get_attr"):
+            return self.env.get_attr(name)
+        raise AttributeError(f"{type(self).__name__} has no attribute get_attr")
+
+    def step(self, actions):  # type: ignore[override]
+        obs, rewards, terminated, truncated, info = self.env.step(actions)
+        return self._augment(obs), rewards, terminated, truncated, info
 
     def step_wait(self):  # type: ignore[override]
         obs, rewards, terminated, truncated, info = self.env.step_wait()

@@ -1,8 +1,6 @@
 """SAC + DrQ-v2 implementation with shared multi-view encoders."""
 
 from __future__ import annotations
-
-import dataclasses
 from functools import partial
 from typing import Mapping, Self, override
 
@@ -12,7 +10,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
-from flax import struct
+from flax import linen as nn, struct
 from flax.core import FrozenDict, freeze
 from flax.training.train_state import TrainState
 from jaxtyping import Array, Float, PRNGKeyArray
@@ -43,7 +41,7 @@ class CriticTrainState(TrainState):
     target_params: FrozenDict | None = None
 
 
-@dataclasses.dataclass
+@struct.dataclass
 class PixelBatch:
     observations: FrozenDict
     actions: jax.Array
@@ -215,12 +213,21 @@ class DrQSAC(OffPolicyAlgorithm[DrQSACConfig]):
         return jax.device_get(dist.mode())
 
     def _encode_observation(self, params: FrozenDict, observation) -> jax.Array:
-        images = {
-            name: jnp.asarray(observation["images"][name])[None, ...]
-            for name in self.view_names
-        }
-        proprio = jnp.asarray(observation["proprio"], dtype=jnp.float32)[None, ...]
-        task = jnp.asarray(observation["task_one_hot"], dtype=jnp.float32)[None, ...]
+        images = {}
+        for name in self.view_names:
+            view = jnp.asarray(observation["images"][name])
+            if view.ndim == 3:
+                view = view[None, ...]
+            images[name] = view
+
+        proprio = jnp.asarray(observation["proprio"], dtype=jnp.float32)
+        if proprio.ndim == 1:
+            proprio = proprio[None, ...]
+
+        task = jnp.asarray(observation["task_one_hot"], dtype=jnp.float32)
+        if task.ndim == 1:
+            task = task[None, ...]
+
         outputs = self._encode(
             params,
             images=images,

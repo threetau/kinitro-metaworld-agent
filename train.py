@@ -22,7 +22,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--total-steps", type=int, default=int(1e6))
     parser.add_argument("--warmstart-steps", type=int, default=5_000)
     parser.add_argument("--batch-size", type=int, default=256)
-    parser.add_argument("--buffer-size", type=int, default=int(1e6))
+    parser.add_argument("--buffer-size", type=int, default=250_000)
     parser.add_argument("--evaluation-frequency", type=int, default=50)
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--tau", type=float, default=0.01)

@@ -35,7 +35,7 @@ class TrainingConfig:
 @dataclass(frozen=True)
 class OffPolicyTrainingConfig(TrainingConfig):
     warmstart_steps: int = int(4e3)
-    buffer_size: int = int(1e6)
+    buffer_size: int = 250_000
     batch_size: int = 1280
 
 

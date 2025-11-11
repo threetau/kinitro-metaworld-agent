@@ -23,6 +23,10 @@ class EnvConfig(abc.ABC):
     @abc.abstractmethod
     def observation_space(self) -> gym.Space: ...
 
+    @cached_property
+    def task_names(self) -> tuple[str, ...] | None:
+        return None
+
     @abc.abstractmethod
     def spawn(self, seed: int = 1) -> GymVectorEnv: ...
 

@@ -216,9 +216,9 @@ class PixelReplayBuffer(AbstractReplayBuffer):
         if not isinstance(env_obs_space, gym.spaces.Dict):
             raise ValueError("PixelReplayBuffer requires a Dict observation space")
 
-        if "images" not in env_obs_space or not isinstance(
-            env_obs_space["images"], gym.spaces.Dict
-        ):
+        space_mapping = getattr(env_obs_space, "spaces", {})
+        image_space = space_mapping.get("images")
+        if image_space is None or not isinstance(image_space, gym.spaces.Dict):
             raise ValueError(
                 "PixelReplayBuffer expects an observation space with an 'images' subspace"
             )
@@ -229,7 +229,6 @@ class PixelReplayBuffer(AbstractReplayBuffer):
         self.size = 0
         self.pos = 0
 
-        image_space: gym.spaces.Dict = env_obs_space["images"]
         self.view_names = tuple(image_space.spaces.keys())
         self.image_shapes = {
             name: tuple(space.shape) for name, space in image_space.spaces.items()

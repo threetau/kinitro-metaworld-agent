@@ -3,18 +3,41 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import override
 
+import os
+os.environ.setdefault("MUJOCO_GL", "egl")
+
 import gymnasium as gym
 import numpy as np
 
+import metaworld as mw
 from metaworld_types import Agent, MetaLearningAgent, GymVectorEnv
 
 from config.envs import EnvConfig, MetaLearningEnvConfig
 from metaworld.evaluation import evaluation, metalearning_evaluation
 
 from .wrappers import (
+    MetaWorldCameraRenderWrapper,
     MetaWorldPixelObservationWrapper,
     MetaWorldVectorPixelObservationWrapper,
 )
+
+
+_CAMERA_WRAPPER_PATCHED = False
+
+
+def _ensure_camera_wrapper_installed() -> None:
+    global _CAMERA_WRAPPER_PATCHED
+    if _CAMERA_WRAPPER_PATCHED:
+        return
+
+    original_init_each_env = mw._init_each_env
+
+    def patched_init_each_env(*args, **kwargs):
+        env = original_init_each_env(*args, **kwargs)
+        return MetaWorldCameraRenderWrapper(env)
+
+    mw._init_each_env = patched_init_each_env
+    _CAMERA_WRAPPER_PATCHED = True
 
 
 @dataclass(frozen=True)
@@ -105,9 +128,9 @@ class MetaworldConfig(EnvConfig):
     @override
     def observation_space(self) -> gym.Space:
         if not self.pixel_observations:
-            return self._base_observation_space()
+            return self._base_observation_space
 
-        base_space = self._base_observation_space()
+        base_space = self._base_observation_space
         assert isinstance(base_space, gym.spaces.Box)
 
         obs_dim = int(np.prod(base_space.shape))
@@ -153,6 +176,17 @@ class MetaworldConfig(EnvConfig):
             return 0
         return self._infer_num_tasks()
 
+    @cached_property
+    def task_names(self) -> tuple[str, ...] | None:
+        env_id = self.env_id.upper()
+        benchmark_cls = getattr(mw, env_id, None)
+        if benchmark_cls is not None:
+            benchmark = benchmark_cls(seed=0)
+            return tuple(benchmark.train_classes.keys())
+        if self.env_name is not None:
+            return (self.env_name,)
+        return None
+
     def _infer_num_tasks(self) -> int:
         env_id = self.env_id.upper()
         if env_id.startswith("MT") and env_id[2:].isdigit():
@@ -167,9 +201,20 @@ class MetaworldConfig(EnvConfig):
 
     @override
     def spawn(self, seed: int = 1) -> GymVectorEnv:
-        render_kwargs = (
-            {"render_mode": "rgb_array"} if self.pixel_observations else {}
-        )
+        if self.pixel_observations:
+            _ensure_camera_wrapper_installed()
+
+        render_kwargs = {}
+        if self.pixel_observations:
+            if self.channels_last:
+                height, width = self.image_shape[0], self.image_shape[1]
+            else:
+                height, width = self.image_shape[1], self.image_shape[2]
+            render_kwargs = {
+                "render_mode": "rgb_array",
+                "height": height,
+                "width": width,
+            }
 
         vector_env = gym.make_vec(  # pyright: ignore[reportReturnType]
             f"Meta-World/{self.env_id}",
@@ -288,6 +333,9 @@ class MetaworldMetaLearningConfig(MetaworldConfig, MetaLearningEnvConfig):
 
     @override
     def spawn(self, seed: int = 1) -> GymVectorEnv:
+        if self.pixel_observations:
+            _ensure_camera_wrapper_installed()
+
         kwargs = dict(
             seed=seed,
             terminate_on_success=self.terminate_on_success,
@@ -303,7 +351,13 @@ class MetaworldMetaLearningConfig(MetaworldConfig, MetaLearningEnvConfig):
         if self.env_name:
             kwargs["env_name"] = self.env_name
         if self.pixel_observations:
+            if self.channels_last:
+                height, width = self.image_shape[0], self.image_shape[1]
+            else:
+                height, width = self.image_shape[1], self.image_shape[2]
             kwargs["render_mode"] = "rgb_array"
+            kwargs["height"] = height
+            kwargs["width"] = width
         env = gym.make_vec(  # pyright: ignore[reportReturnType]
             f"Meta-World/{self.env_id}-train",
             **kwargs,  # pyright: ignore[reportArgumentType]
@@ -312,6 +366,9 @@ class MetaworldMetaLearningConfig(MetaworldConfig, MetaLearningEnvConfig):
 
     @override
     def spawn_test(self, seed: int = 1) -> GymVectorEnv:
+        if self.pixel_observations:
+            _ensure_camera_wrapper_installed()
+
         kwargs = dict(
             seed=seed,
             terminate_on_success=True,
@@ -327,7 +384,13 @@ class MetaworldMetaLearningConfig(MetaworldConfig, MetaLearningEnvConfig):
         if self.env_name:
             kwargs["env_name"] = self.env_name
         if self.pixel_observations:
+            if self.channels_last:
+                height, width = self.image_shape[0], self.image_shape[1]
+            else:
+                height, width = self.image_shape[1], self.image_shape[2]
             kwargs["render_mode"] = "rgb_array"
+            kwargs["height"] = height
+            kwargs["width"] = width
         env = gym.make_vec(  # pyright: ignore[reportReturnType]
             f"Meta-World/{self.env_id}-test",
             **kwargs,  # pyright: ignore[reportArgumentType]
